@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5AC8FA">
+<meta name="mobile-web-app-capable" content="yes">
+<title>麥輪小車藍牙遙控器</title>
+<style>
+:root{
+  --blue:#007AFF; --green:#34C759; --orange:#FF9500; --pink:#FF2D55; --purple:#AF52DE;
+  --teal:#5AC8FA; --yellow:#FFCC00; --red:#FF3B30; --indigo:#5856D6;
+  --text:#1C1C1E; --muted:#6E6E73;
+  --led-on:#FF3B30; --led-off:#3A1D1D;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+body{background:
+  radial-gradient(circle at 12% 18%,rgba(255,204,0,.55),transparent 38%),
+  radial-gradient(circle at 88% 22%,rgba(255,45,85,.45),transparent 40%),
+  radial-gradient(circle at 80% 90%,rgba(52,199,89,.45),transparent 40%),
+  radial-gradient(circle at 15% 88%,rgba(175,82,222,.45),transparent 40%),
+  linear-gradient(135deg,#5AC8FA,#007AFF 55%,#5856D6);}
+
+/* ---------- 上方狀態列（毛玻璃）---------- */
+.topbar{height:52px;display:flex;align-items:center;gap:10px;padding:0 14px;
+  background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(255,255,255,.6)}
+.status{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;flex:1;min-width:0}
+.status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:11px;height:11px;border-radius:50%;background:#C7C7CC;flex:none}
+.dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(52,199,89,.25)}
+.dot.busy{background:var(--orange);animation:blink .8s infinite}
+@keyframes blink{50%{opacity:.3}}
+.chip{font-size:13px;color:var(--muted);white-space:nowrap;background:rgba(118,118,128,.12);
+  padding:6px 12px;border-radius:999px}
+.chip b{color:var(--blue)}
+.tbtn{border:none;background:rgba(118,118,128,.14);color:var(--blue);border-radius:999px;
+  height:36px;padding:0 18px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.tbtn.primary{background:var(--blue);color:#fff}
+.tbtn.danger{background:var(--red);color:#fff}
+.tbtn.icon{width:36px;padding:0;font-size:18px;color:var(--text)}
+
+/* ---------- 舞台（等比縮放）---------- */
+.wrap{position:absolute;top:52px;left:0;right:0;bottom:0;display:flex;align-items:center;
+  justify-content:center;overflow:hidden}
+.stage{position:relative;width:900px;height:700px;flex:none;transform-origin:center center}
+.body-svg{position:absolute;inset:0;width:900px;height:700px;
+  filter:drop-shadow(0 24px 40px rgba(0,0,40,.28))}
+
+/* ---------- 上方 LED 控制板 ---------- */
+.board{position:absolute;left:270px;top:10px;width:360px;height:290px;border-radius:28px;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.02) 0 2px,transparent 2px 9px),
+    linear-gradient(160deg,#2E3238,#1A1C20);
+  border:1px solid #3A3F46;box-shadow:0 14px 34px rgba(0,0,40,.35);z-index:2}
+.speed-pad{position:absolute;left:146px;top:10px;width:68px;height:36px;border-radius:20px;
+  background:linear-gradient(135deg,var(--orange),var(--pink));display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;color:#fff;letter-spacing:1px;cursor:pointer;
+  box-shadow:0 4px 10px rgba(255,45,85,.35)}
+.speed-pad:active{transform:scale(.94)}
+.leds{position:absolute;left:95px;top:54px;display:grid;grid-template-columns:repeat(5,26px);gap:10px}
+.led{width:26px;height:26px;border-radius:8px;background:var(--led-off);
+  transition:background .06s,box-shadow .06s}
+.led.on{background:var(--led-on);box-shadow:0 0 10px rgba(255,59,48,.8),0 0 20px rgba(255,59,48,.45)}
+.mbtn{position:absolute;top:100px;width:54px;height:54px;border-radius:16px;
+  background:linear-gradient(#D9D9DE,#A9A9AF);box-shadow:0 4px 0 #6B6B70,0 6px 12px rgba(0,0,0,.3);
+  cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mbtn::after{content:"";width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--teal),var(--blue))}
+.mbtn.b::after{background:linear-gradient(135deg,var(--purple),var(--indigo))}
+.mbtn.down{transform:translateY(4px);box-shadow:0 0 0 #6B6B70}
+.mbtn.a{left:14px}.mbtn.b{right:14px}
+.mlabel{position:absolute;top:160px;font-size:14px;font-weight:700;color:#F2F2F7;
+  text-align:center;width:54px;line-height:1.3}
+.mlabel small{display:block;font-size:11px;font-weight:500;color:#AEAEB2}
+.mlabel.a{left:14px}.mlabel.b{right:14px}
+.pads{position:absolute;left:28px;top:234px;display:flex;gap:31px}
+.pad{width:36px;height:36px;border-radius:50%;border:7px solid #C9A227;background:#0B0B0C}
+.slot{position:absolute;left:290px;top:288px;width:320px;height:58px;border-radius:12px;z-index:3;
+  background:
+    repeating-linear-gradient(90deg,#9A9A9A 0 2px,transparent 2px 6px) bottom/100% 10px no-repeat,
+    linear-gradient(#3B3B3E,#232326);box-shadow:0 4px 10px rgba(0,0,0,.4)}
+
+/* ---------- 搖桿 ---------- */
+.joy-base{position:absolute;left:115px;top:415px;width:190px;height:190px;border-radius:50%;
+  background:radial-gradient(circle,#1B1B1D 0 55%,#070708 72%);border:3px solid #2E2E31;
+  box-shadow:inset 0 0 20px #000,0 6px 16px rgba(0,0,0,.5);z-index:2;cursor:grab}
+.joy-knob{position:absolute;left:33px;top:33px;width:118px;height:118px;border-radius:50%;
+  background:radial-gradient(circle at 40% 32%,#7A7A7E,#444447 55%,#2C2C2E);
+  box-shadow:0 8px 14px rgba(0,0,0,.7),inset 0 -6px 10px rgba(0,0,0,.4);pointer-events:none}
+.joy-knob::after{content:"";position:absolute;inset:20px;border-radius:50%;
+  background:repeating-radial-gradient(circle,rgba(0,0,0,.2) 0 2px,transparent 2px 5px)}
+
+/* ---------- 四色按鍵 ---------- */
+.gbtn{position:absolute;width:78px;height:78px;border-radius:50%;cursor:pointer;z-index:2;
+  display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;
+  box-shadow:0 6px 0 rgba(0,0,0,.14),0 10px 18px rgba(0,0,0,.15),inset 0 -6px 10px rgba(0,0,0,.12);
+  transition:transform .05s}
+.gbtn.down{transform:translateY(4px) scale(.95);box-shadow:0 2px 0 rgba(0,0,0,.14),inset 0 4px 10px rgba(0,0,0,.2)}
+.gbtn.x{left:571px;top:456px;background:radial-gradient(circle at 38% 30%,#FF8A80,var(--red) 70%)}
+.gbtn.y{left:666px;top:376px;background:radial-gradient(circle at 38% 30%,#86EFAC,var(--green) 70%)}
+.gbtn.b{left:746px;top:466px;background:radial-gradient(circle at 38% 30%,#FFE680,var(--yellow) 70%);color:rgba(0,0,0,.55)}
+.gbtn.a{left:661px;top:551px;background:radial-gradient(circle at 38% 30%,#93C5FD,var(--blue) 70%)}
+.glabel{position:absolute;font-size:24px;font-weight:700;color:#E5E5EA;z-index:2;pointer-events:none}
+.glabel.x{left:600px;top:420px}.glabel.y{left:695px;top:340px}
+.glabel.b{left:818px;top:552px}.glabel.a{left:690px;top:636px}
+
+/* ---------- 開關（iOS 風格）---------- */
+.sw{position:absolute;width:78px;z-index:2;text-align:center;cursor:pointer}
+.sw .lab{display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:#C7C7CC;padding:0 4px}
+.sw .track{position:relative;height:32px;width:58px;margin:4px auto;border-radius:999px;background:#48484A;
+  transition:background .2s}
+.sw .knob{position:absolute;top:2px;left:2px;width:28px;height:28px;border-radius:50%;background:#fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.2);transition:left .2s}
+.sw.on .track{background:var(--green)}
+.sw.on .knob{left:28px}
+.sw .name{font-size:11px;font-weight:700;color:#F2F2F7;letter-spacing:1px}
+.sw.power{left:356px;top:362px}.sw.fx{left:456px;top:362px}
+
+/* ---------- 裝飾 ---------- */
+.buzzer{position:absolute;left:366px;top:445px;width:62px;height:62px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#FFD1DC,var(--pink));z-index:2;
+  box-shadow:0 6px 14px rgba(255,45,85,.35)}
+.buzzer::after{content:"♪";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:24px;font-weight:700}
+.motor{position:absolute;left:452px;top:462px;width:56px;height:30px;border-radius:10px;z-index:2;
+  background:linear-gradient(90deg,var(--purple),var(--indigo));box-shadow:0 6px 12px rgba(88,86,214,.35)}
+.brand{position:absolute;left:340px;top:560px;width:220px;text-align:center;z-index:2;
+  font-size:15px;font-weight:800;letter-spacing:2px;line-height:1.5;pointer-events:none;
+  background:linear-gradient(90deg,var(--teal),#C38BFF,#FF6B8A);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.brand small{display:block;font-size:11px;font-weight:600;letter-spacing:1px;color:#AEAEB2;
+  -webkit-text-fill-color:#AEAEB2}
+
+/* ---------- 提示 ---------- */
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+  background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  color:var(--text);padding:12px 18px;border-radius:16px;font-size:14px;font-weight:500;
+  box-shadow:0 10px 30px rgba(0,0,0,.2);
+  max-width:90vw;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+
+/* ---------- 設定視窗 ---------- */
+dialog{border:none;border-radius:20px;background:#F2F2F7;color:var(--text);
+  padding:0;max-width:min(520px,92vw);width:100%;touch-action:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.3);backdrop-filter:blur(4px)}
+.dlg{padding:18px 20px;max-height:80vh;overflow:auto;touch-action:pan-y}
+.dlg h2{margin:0 0 12px;font-size:20px;font-weight:700}
+.dlg h3{margin:16px 0 8px;font-size:13px;color:var(--muted);font-weight:600}
+.row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+  background:#fff;font-size:15px;gap:12px;border-bottom:1px solid #E5E5EA}
+.row:first-of-type{border-radius:12px 12px 0 0}
+.row:nth-of-type(3){border-radius:0 0 12px 12px;border-bottom:none}
+.row input{width:22px;height:22px;accent-color:var(--green)}
+.help{font-size:14px;color:#3A3A3C;line-height:1.7;margin:0;padding:10px 14px 10px 32px;
+  background:#fff;border-radius:12px}
+.dlg .actions{display:flex;justify-content:flex-end;margin-top:16px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="status"><div class="dot" id="dot"></div><span id="statusText">未連線</span></div>
+  <div class="chip">速度 <b id="gearText">中</b></div>
+  <button class="tbtn primary" id="connectBtn">連線</button>
+  <button class="tbtn icon" id="settingsBtn" aria-label="設定">⚙</button>
+</div>
+
+<div class="wrap">
+  <div class="stage" id="stage">
+    <svg class="body-svg" viewBox="0 0 900 700" aria-hidden="true">
+      <defs>
+        <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2A2D33"/>
+          <stop offset="1" stop-color="#121417"/>
+        </linearGradient>
+      </defs>
+      <path d="M 50 470 C 50 360, 190 300, 320 296 L 580 296 C 710 300, 850 360, 850 470
+               L 850 600 C 850 670, 790 700, 730 690 C 670 680, 630 640, 555 636
+               L 345 636 C 270 640, 230 680, 170 690 C 110 700, 50 670, 50 600 Z"
+            fill="url(#bodyGrad)" stroke="#3A3F46" stroke-width="3"/>
+      <g stroke="#26332C" stroke-width="2" fill="none" stroke-linecap="round">
+        <path d="M 110 400 L 300 400 L 330 370 L 520 370"/>
+        <path d="M 600 340 L 640 380 L 820 380"/>
+        <path d="M 330 620 L 560 620"/>
+        <path d="M 520 420 L 560 460 L 560 540"/>
+        <path d="M 360 520 L 360 600"/>
+      </g>
+      <circle cx="105" cy="640" r="16" fill="#F2F2F7"/>
+      <circle cx="795" cy="640" r="16" fill="#F2F2F7"/>
+    </svg>
+
+    <div class="board">
+      <div class="speed-pad" id="speedPad" title="切換速度">SPEED</div>
+      <div class="leds" id="leds"></div>
+      <div class="mbtn a" id="btnMA"></div>
+      <div class="mbtn b" id="btnMB"></div>
+      <div class="mlabel a">A<small>左轉 ↺</small></div>
+      <div class="mlabel b">B<small>右轉 ↻</small></div>
+      <div class="pads"><div class="pad"></div><div class="pad"></div><div class="pad"></div><div class="pad"></div><div class="pad"></div></div>
+    </div>
+    <div class="slot"></div>
+
+    <div class="sw power" id="swPower">
+      <div class="lab"><span>OFF</span><span>ON</span></div>
+      <div class="track"><div class="knob"></div></div>
+      <div class="name">POWER</div>
+    </div>
+    <div class="sw fx on" id="swFx">
+      <div class="lab"><span>OFF</span><span>ON</span></div>
+      <div class="track"><div class="knob"></div></div>
+      <div class="name">EFFECTS</div>
+    </div>
+
+    <div class="buzzer"></div>
+    <div class="motor"></div>
+    <div class="brand">麥輪遙控器<small>Web Bluetooth Ver 1.0</small></div>
+
+    <div class="joy-base" id="joy"><div class="joy-knob" id="knob"></div></div>
+
+    <div class="gbtn y" id="btnY">↗</div>
+    <div class="gbtn x" id="btnX">↖</div>
+    <div class="gbtn b" id="btnB">↘</div>
+    <div class="gbtn a" id="btnA">↙</div>
+    <div class="glabel y">Y</div>
+    <div class="glabel x">X</div>
+    <div class="glabel b">B</div>
+    <div class="glabel a">A</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<dialog id="settings">
+  <div class="dlg">
+    <h2>設定與說明</h2>
+    <h3>方向修正（方向相反時勾選，立即生效）</h3>
+    <label class="row">左右平移相反<input type="checkbox" id="invX"></label>
+    <label class="row">前進後退相反<input type="checkbox" id="invY"></label>
+    <label class="row">旋轉方向相反<input type="checkbox" id="invR"></label>
+    <h3>操作方式</h3>
+    <ul class="help">
+      <li>搖桿：全方向移動，推越多越快，放開即停</li>
+      <li>X ↖ 左上、Y ↗ 右上、A ↙ 左下、B ↘ 右下（按住才會動）</li>
+      <li>LED 板上的 A：向左旋轉、B：向右旋轉（按住）</li>
+      <li>SPEED：切換速度（低 → 中 → 高）</li>
+      <li>POWER 開關或右上「連線」：藍牙連線／中斷</li>
+      <li>EFFECTS 開關：按鍵音效與震動</li>
+      <li>鍵盤：方向鍵或 W/S/A/D 移動，Q/E 旋轉，G 換速度</li>
+    </ul>
+    <h3>連線需求</h3>
+    <ul class="help">
+      <li>使用 Chrome 或 Edge（Android、Windows、Mac、Chromebook）</li>
+      <li>iPhone / iPad 請改用 Bluefy 瀏覽器開啟本檔案</li>
+      <li>小車需燒錄「藍牙版」小車程式</li>
+    </ul>
+    <div class="actions"><button class="tbtn primary" id="closeSettings">完成</button></div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== 參數 =====
+  const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+  const UART_RX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";   // 網頁 → micro:bit
+  const SEND_MS = 50;          // 檢查頻率
+  const HEARTBEAT_MS = 150;    // 數值沒變也至少每 150ms 送一次（小車 400ms 沒收到會停）
+  const DEADZONE = 10;         // 搖桿死區 (0~100)
+  const DIAG = 70;             // X/Y/A/B 斜角速度
+  const ROT = 70;              // 旋轉速度
+  const GEARS = [40, 70, 100];
+  const GEAR_NAMES = ["低", "中", "高"];
+
+  // ===== 狀態 =====
+  let device = null, rxChar = null, connected = false, connecting = false, writing = false;
+  let lastMsg = "", lastSend = 0;
+  let gear = 1, gearShowUntil = 0;
+  let effects = true;
+  let inv = { x: false, y: false, r: false };
+  const joy = { x: 0, y: 0 };
+  const pressed = { X: false, Y: false, A: false, B: false, MA: false, MB: false };
+  const keys = {};
+
+  const $ = (id) => document.getElementById(id);
+
+  // ===== 儲存設定 =====
+  function loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem("mecanumRemote") || "{}");
+      if (typeof s.gear === "number") gear = Math.max(0, Math.min(2, s.gear));
+      if (typeof s.effects === "boolean") effects = s.effects;
+      if (s.inv) inv = Object.assign(inv, s.inv);
+    } catch (e) { /* 忽略 */ }
+  }
+  function saveSettings() {
+    try { localStorage.setItem("mecanumRemote", JSON.stringify({ gear, effects, inv })); } catch (e) { }
+  }
+
+  // ===== 提示 =====
+  let toastTimer = 0;
+  function toast(msg, ms) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), ms || 2500);
+  }
+
+  // ===== 音效與震動 =====
+  let audioCtx = null;
+  function beep(freq, dur) {
+    if (!effects) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "square"; o.frequency.value = freq || 880;
+      g.gain.value = 0.05;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + (dur || 0.05));
+    } catch (e) { }
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) { } }
+  }
+
+  // ===== 5x5 LED =====
+  const ledEls = [];
+  (function buildLeds() {
+    const box = $("leds");
+    for (let i = 0; i < 25; i++) {
+      const d = document.createElement("div");
+      d.className = "led";
+      box.appendChild(d);
+      ledEls.push(d);
+    }
+  })();
+
+  const P = {
+    up:    ["..#..", ".###.", "#.#.#", "..#..", "..#.."],
+    down:  ["..#..", "..#..", "#.#.#", ".###.", "..#.."],
+    left:  ["..#..", ".#...", "#####", ".#...", "..#.."],
+    right: ["..#..", "...#.", "#####", "...#.", "..#.."],
+    ur:    ["..###", "...##", "..#.#", ".#...", "#...."],
+    ul:    ["###..", "##...", "#.#..", "...#.", "....#"],
+    dr:    ["#....", ".#...", "..#.#", "...##", "..###"],
+    dl:    ["....#", "...#.", "#.#..", "##...", "###.."],
+    rotR:  [".##..", "#..#.", "#.###", "#..#.", ".##.."],
+    rotL:  ["..##.", ".#..#", "###.#", ".#..#", "..##."],
+    stop:  [".....", ".....", "..#..", ".....", "....."],
+    off:   ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
+    g0:    [".....", ".....", ".....", ".....", "#...."],
+    g1:    [".....", ".....", "..#..", "..#..", "#.#.."],
+    g2:    ["....#", "....#", "..#.#", "..#.#", "#.#.#"]
+  };
+  let lastPattern = "";
+  function showPattern(name) {
+    if (name === lastPattern) return;
+    lastPattern = name;
+    const p = P[name];
+    for (let r = 0; r < 5; r++)
+      for (let c = 0; c < 5; c++)
+        ledEls[r * 5 + c].classList.toggle("on", p[r][c] === "#");
+  }
+
+  // 依 x/y/r 判斷 10 個方向（與小車相同的判斷方式）
+  function directionName(x, y, r) {
+    if (x === 0 && y === 0 && r === 0) return connected ? "stop" : "off";
+    if (Math.abs(r) > Math.max(Math.abs(x), Math.abs(y))) return r > 0 ? "rotR" : "rotL";
+    const sector = (Math.round(Math.atan2(y, x) * 4 / Math.PI) + 8) % 8;
+    return ["right", "ur", "up", "ul", "left", "dl", "down", "dr"][sector];
+  }
+
+  // ===== 搖桿 =====
+  const joyEl = $("joy"), knob = $("knob");
+  const TRAVEL = 62;
+  let joyPointer = null;
+  function shape(v) {
+    const a = Math.abs(v);
+    if (a < DEADZONE) return 0;
+    let n = (a - DEADZONE) * 100 / (100 - DEADZONE);
+    n = n * (40 + 60 * n / 100) / 100;
+    return v > 0 ? n : -n;
+  }
+  function setJoyFromEvent(e) {
+    const rect = joyEl.getBoundingClientRect();
+    const scale = rect.width / 190;              // 舞台被縮放時換算
+    let dx = (e.clientX - (rect.left + rect.width / 2)) / scale;
+    let dy = (e.clientY - (rect.top + rect.height / 2)) / scale;
+    const d = Math.hypot(dx, dy);
+    if (d > TRAVEL) { dx = dx * TRAVEL / d; dy = dy * TRAVEL / d; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    joy.x = shape(dx / TRAVEL * 100);
+    joy.y = shape(-dy / TRAVEL * 100);
+  }
+  function resetJoy() {
+    joyPointer = null;
+    knob.style.transition = "transform .12s";
+    knob.style.transform = "translate(0px, 0px)";
+    setTimeout(() => { knob.style.transition = ""; }, 130);
+    joy.x = 0; joy.y = 0;
+  }
+  joyEl.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    joyPointer = e.pointerId;
+    try { joyEl.setPointerCapture(e.pointerId); } catch (err) { }
+    knob.style.transition = "";
+    setJoyFromEvent(e);
+  });
+  joyEl.addEventListener("pointermove", (e) => { if (e.pointerId === joyPointer) setJoyFromEvent(e); });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) =>
+    joyEl.addEventListener(ev, (e) => { if (e.pointerId === joyPointer) resetJoy(); }));
+
+  // ===== 按住型按鍵 =====
+  function bindHold(id, key, freq) {
+    const el = $(id);
+    const down = (e) => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (err) { }
+      if (!pressed[key]) beep(freq, 0.04);
+      pressed[key] = true;
+      el.classList.add("down");
+    };
+    const up = () => { pressed[key] = false; el.classList.remove("down"); };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    el.addEventListener("lostpointercapture", up);
+  }
+  bindHold("btnX", "X", 660);
+  bindHold("btnY", "Y", 740);
+  bindHold("btnA", "A", 520);
+  bindHold("btnB", "B", 590);
+  bindHold("btnMA", "MA", 880);
+  bindHold("btnMB", "MB", 990);
+
+  // ===== 速度 =====
+  function setGear(g, show) {
+    gear = (g + 3) % 3;
+    $("gearText").textContent = GEAR_NAMES[gear];
+    if (show) { gearShowUntil = performance.now() + 800; beep(600 + gear * 200, 0.07); }
+    saveSettings();
+  }
+  $("speedPad").addEventListener("pointerdown", (e) => { e.preventDefault(); setGear(gear + 1, true); });
+
+  // ===== 開關 =====
+  function setPowerSwitch(on) { $("swPower").classList.toggle("on", on); }
+  $("swPower").addEventListener("click", () => { connected ? disconnect() : connect(); });
+  $("swFx").addEventListener("click", () => {
+    effects = !effects;
+    $("swFx").classList.toggle("on", effects);
+    if (effects) beep(880, 0.06);
+    saveSettings();
+  });
+
+  // ===== 鍵盤 =====
+  const KEYMAP = { arrowup: "up", w: "up", arrowdown: "down", s: "down", arrowleft: "left", a: "left",
+    arrowright: "right", d: "right", q: "rl", e: "rr" };
+  window.addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (k === "g" && !e.repeat) { setGear(gear + 1, true); return; }
+    if (KEYMAP[k]) { keys[KEYMAP[k]] = true; e.preventDefault(); }
+  });
+  window.addEventListener("keyup", (e) => {
+    const k = e.key.toLowerCase();
+    if (KEYMAP[k]) keys[KEYMAP[k]] = false;
+  });
+
+  function releaseAll() {
+    for (const k in pressed) pressed[k] = false;
+    for (const k in keys) keys[k] = false;
+    document.querySelectorAll(".down").forEach((el) => el.classList.remove("down"));
+    resetJoy();
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
+  window.addEventListener("blur", releaseAll);
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // ===== 計算控制值 =====
+  function compute() {
+    let x = joy.x, y = joy.y;
+
+    const kx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    const ky = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+    if (kx || ky) {
+      x = kx * 100; y = ky * 100;
+      if (kx && ky) { x *= 0.71; y *= 0.71; }
+    }
+
+    if (x === 0 && y === 0) {
+      let dx = 0, dy = 0;
+      if (pressed.X) { dx -= 1; dy += 1; }
+      if (pressed.Y) { dx += 1; dy += 1; }
+      if (pressed.A) { dx -= 1; dy -= 1; }
+      if (pressed.B) { dx += 1; dy -= 1; }
+      dx = Math.max(-1, Math.min(1, dx));
+      dy = Math.max(-1, Math.min(1, dy));
+      x = dx * DIAG; y = dy * DIAG;
+    }
+
+    let r = 0;
+    if (pressed.MA || keys.rl) r -= ROT;
+    if (pressed.MB || keys.rr) r += ROT;
+
+    const k = GEARS[gear] / 100;
+    return { x: Math.round(x * k), y: Math.round(y * k), r: Math.round(r * k) };
+  }
+
+  // ===== 藍牙 =====
+  function setStatus(kind, text) {
+    $("dot").className = "dot" + (kind ? " " + kind : "");
+    $("statusText").textContent = text;
+    const btn = $("connectBtn");
+    btn.textContent = connected ? "中斷" : (connecting ? "連線中…" : "連線");
+    btn.classList.toggle("primary", !connected);
+    btn.classList.toggle("danger", connected);
+  }
+
+  async function connect() {
+    if (connecting || connected) return;
+    if (!navigator.bluetooth) {
+      setPowerSwitch(false);
+      toast("此瀏覽器不支援 Web Bluetooth。請用 Chrome / Edge；iPhone 請用 Bluefy 瀏覽器。", 5000);
+      return;
+    }
+    connecting = true;
+    setPowerSwitch(true);
+    setStatus("busy", "選擇小車…");
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "BBC micro:bit" }],
+        optionalServices: [UART_SERVICE]
+      });
+      device.addEventListener("gattserverdisconnected", onDisconnected);
+      setStatus("busy", "連線中…");
+      const server = await device.gatt.connect();
+      const svc = await server.getPrimaryService(UART_SERVICE);
+      const chars = await svc.getCharacteristics();
+      rxChar = chars.find((c) => c.uuid === UART_RX && (c.properties.write || c.properties.writeWithoutResponse))
+        || chars.find((c) => c.properties.write || c.properties.writeWithoutResponse) || null;
+      if (!rxChar) throw new Error("找不到 UART 寫入通道，請確認小車已燒錄藍牙版程式");
+      connected = true;
+      connecting = false;
+      lastMsg = "";
+      setStatus("on", "已連線：" + (device.name || "micro:bit"));
+      beep(1200, 0.08);
+      toast("連線成功，可以開始控制小車");
+    } catch (e) {
+      connecting = false;
+      connected = false;
+      setPowerSwitch(false);
+      if (device && device.gatt.connected) device.gatt.disconnect();
+      if (e && e.name === "NotFoundError") {
+        setStatus("", "未連線");
+      } else {
+        setStatus("", "連線失敗");
+        toast("連線失敗：" + (e && e.message ? e.message : e), 5000);
+      }
+    }
+  }
+
+  async function disconnect() {
+    if (!device) return;
+    try { if (connected && rxChar) await writeLine("0,0,0\n"); } catch (e) { }
+    try { device.gatt.disconnect(); } catch (e) { }
+  }
+
+  function onDisconnected() {
+    connected = false;
+    connecting = false;
+    rxChar = null;
+    setPowerSwitch(false);
+    setStatus("", "已中斷連線");
+    toast("藍牙已中斷");
+  }
+
+  const enc = new TextEncoder();
+  async function writeLine(s) {
+    if (!rxChar) return;
+    writing = true;
+    try {
+      const data = enc.encode(s);
+      if (rxChar.properties.writeWithoutResponse && rxChar.writeValueWithoutResponse) {
+        await rxChar.writeValueWithoutResponse(data);
+      } else if (rxChar.writeValueWithResponse) {
+        await rxChar.writeValueWithResponse(data);
+      } else {
+        await rxChar.writeValue(data);
+      }
+      lastSend = performance.now();
+    } catch (e) {
+      /* 偶發失敗略過，下一輪會重送 */
+    } finally {
+      writing = false;
+    }
+  }
+
+  // ===== 主迴圈 =====
+  function tick() {
+    const v = compute();
+    const now = performance.now();
+
+    if (now < gearShowUntil) showPattern("g" + gear);
+    else showPattern(directionName(v.x, v.y, v.r));
+
+    if (connected && !writing) {
+      const sx = inv.x ? -v.x : v.x;
+      const sy = inv.y ? -v.y : v.y;
+      const sr = inv.r ? -v.r : v.r;
+      const msg = sx + "," + sy + "," + sr + "\n";
+      if (msg !== lastMsg || now - lastSend > HEARTBEAT_MS) {
+        lastMsg = msg;
+        writeLine(msg);
+      }
+    }
+  }
+  setInterval(tick, SEND_MS);
+
+  // ===== 縮放 =====
+  function fit() {
+    const w = window.innerWidth, h = window.innerHeight - 52;
+    const s = Math.min(w / 900, h / 700) * 0.98;
+    $("stage").style.transform = `scale(${s})`;
+  }
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", () => setTimeout(fit, 200));
+
+  // ===== 設定視窗 =====
+  const dlg = $("settings");
+  $("settingsBtn").addEventListener("click", () => {
+    $("invX").checked = inv.x; $("invY").checked = inv.y; $("invR").checked = inv.r;
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  });
+  $("closeSettings").addEventListener("click", () => { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); });
+  ["invX", "invY", "invR"].forEach((id) => $(id).addEventListener("change", () => {
+    inv = { x: $("invX").checked, y: $("invY").checked, r: $("invR").checked };
+    saveSettings();
+  }));
+  $("connectBtn").addEventListener("click", () => { connected ? disconnect() : connect(); });
+
+  // ===== 啟動 =====
+  loadSettings();
+  $("swFx").classList.toggle("on", effects);
+  setGear(gear, false);
+  setStatus("", "未連線");
+  fit();
+  if (!navigator.bluetooth) {
+    toast("此瀏覽器不支援藍牙連線，可先試操作畫面。請用 Chrome / Edge 開啟。", 5000);
+  }
+})();
+</script>
+</body>
+</html>
